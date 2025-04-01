@@ -1,34 +1,21 @@
-name: Go Build Matrix
+name: Go Cross-Platform Build
 
 on: [push, pull_request]
 
 env:
-  GO_VERSION: "1.21"  # 官方验证过的稳定版本
-  OUTPUT_DIR: "dist"
+  GO_VERSION: "1.21"
+  OUTPUT_DIR: "dist"  # 输出目录名不要带特殊字符
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Validate Project Structure
-        run: |
-          [ -f go.mod ] || (echo "❌ go.mod not found" && exit 1)
-          echo "✅ Project contains go.mod"
-          echo "Module name: $(head -1 go.mod)"
-
   build:
-    needs: validate
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         target:
-          - { os: linux, arch: amd64, ext: '' }
-          - { os: linux, arch: arm64, ext: '' }
-          - { os: windows, arch: amd64, ext: '.exe' }
+          - { os: linux, arch: amd64 }
+          - { os: linux, arch: arm64 }
+          - { os: windows, arch: amd64, ext: ".exe" }
 
     steps:
       - uses: actions/checkout@v4
@@ -37,34 +24,26 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
 
-      - name: Show Go Env
-        run: go env
+      - name: Create output directory
+        run: mkdir -p "${{ env.OUTPUT_DIR }}"
 
-      - name: Build Debug Info
-        run: |
-          echo "📌 Build Target: ${{ matrix.target.os }}/${{ matrix.target.arch }}"
-          echo "📌 Project Files:"
-          ls -la
-          echo "📌 Go Modules:"
-          go list -m all
-
-      - name: Build Binary
+      - name: Build
         env:
           GOOS: ${{ matrix.target.os }}
           GOARCH: ${{ matrix.target.arch }}
-          CGO_ENABLED: 0
+          CGO_ENABLED: "0"
         run: |
-          mkdir -p ${{ env.OUTPUT_DIR }}
-          OUTPUT="${{ github.repository }}".split('/')[-1]  # 自动从仓库名获取项目名
-          go build -v -o "${{ env.OUTPUT_DIR }}/$OUTPUT-${{ matrix.target.os }}-${{ matrix.target.arch }}${{ matrix.target.ext }}" .
-          echo "✅ Build succeeded"
+          EXT="${matrix.target.ext:-}"
+          OUTPUT="app-${{ matrix.target.os }}-${{ matrix.target.arch }}${EXT}"
+          go build -v -o "${{ env.OUTPUT_DIR }}/$OUTPUT" .
+          
+          # 生成校验和（简化版）
+          cd "${{ env.OUTPUT_DIR }}" && sha256sum "$OUTPUT" > "$OUTPUT.sha256"
 
-      - name: Upload Artifact
-        if: success()
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target.os }}-${{ matrix.target.arch }}
-          path: ${{ env.OUTPUT_DIR }}/*
+          path: ${{ env.OUTPUT_DIR }}/app-${{ matrix.target.os }}-${{ matrix.target.arch }}*
           retention-days: 3
