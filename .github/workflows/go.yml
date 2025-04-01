@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 env:
   GO_VERSION: "1.21"
-  OUTPUT_DIR: "dist"  # 输出目录名不要带特殊字符
+  OUTPUT_DIR: "dist"
 
 jobs:
   build:
@@ -13,8 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - { os: linux, arch: amd64 }
-          - { os: linux, arch: arm64 }
+          - { os: linux, arch: amd64, ext: "" }
+          - { os: linux, arch: arm64, ext: "" }
           - { os: windows, arch: amd64, ext: ".exe" }
 
     steps:
@@ -32,14 +32,17 @@ jobs:
         env:
           GOOS: ${{ matrix.target.os }}
           GOARCH: ${{ matrix.target.arch }}
+          EXT: ${{ matrix.target.ext }}
           CGO_ENABLED: "0"
         run: |
-          EXT="${matrix.target.ext:-}"
-          OUTPUT="app-${{ matrix.target.os }}-${{ matrix.target.arch }}${EXT}"
+          OUTPUT="app-${{ matrix.target.os }}-${{ matrix.target.arch }}$EXT"
+          echo "Building $OUTPUT"
+          
           go build -v -o "${{ env.OUTPUT_DIR }}/$OUTPUT" .
           
-          # 生成校验和（简化版）
-          cd "${{ env.OUTPUT_DIR }}" && sha256sum "$OUTPUT" > "$OUTPUT.sha256"
+          # 生成校验和
+          (cd "${{ env.OUTPUT_DIR }}" && \
+           sha256sum "$OUTPUT" > "$OUTPUT.sha256")
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
