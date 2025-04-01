@@ -3,7 +3,7 @@ name: CI
 on: [push, pull_request,workflow_dispatch]
 
 env:
-  BINARY_PREFIX: "PortLink_"
+  BINARY_PREFIX: "PortLink"
   BINARY_SUFFIX: ""
   COMMIT_ID: "${{ github.sha }}"
   PR_PROMPT: "::warning:: Build artifact will not be uploaded due to the workflow is trigged by pull request."
@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         # build and publish in parallel: linux/386, linux/amd64, windows/386, windows/amd64, darwin/amd64, darwin/arm64
-        goos: [linux, windows, darwin]
+        goos: [linux, windows]
         goarch: ["386", amd64, arm, arm64]
         exclude:
           - goos: darwin
@@ -38,7 +38,7 @@ jobs:
         run: |
           if [ $GOOS = "windows" ]; then export BINARY_SUFFIX="$BINARY_SUFFIX.exe"; fi
           if $IS_PR ; then echo $PR_PROMPT; fi
-          export BINARY_NAME="$BINARY_PREFIX"$GOOS"_$GOARCH$BINARY_SUFFIX"
+          export BINARY_NAME="$BINARY_PREFIX"
           export CGO_ENABLED=0
           export LD_FLAGS="-w -s -X github.com/Mrs4s/go-cqhttp/internal/base.Version=${COMMIT_ID::7}"
           go build -o "output/$BINARY_NAME" -trimpath -ldflags "$LD_FLAGS" .
@@ -46,5 +46,5 @@ jobs:
         uses: actions/upload-artifact@v4
         if: ${{ !github.head_ref }}
         with:
-          name: ${{ matrix.goos }}_${{ matrix.goarch }}
+          name: $BINARY_PREFIX_${{ matrix.goos }}_${{ matrix.goarch }}
           path: output/
