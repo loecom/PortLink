@@ -1,0 +1,49 @@
+name: Go CI/CD
+
+on:
+  push:
+    branches: [main, master]  # 触发分支
+  pull_request:
+    branches: [main, master]  # 触发 PR
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # 使用 Ubuntu 环境
+    strategy:
+      matrix:
+        go-version: ["1.20", "1.21"]  # 测试多个 Go 版本
+        os: [ubuntu-latest, macos-latest, windows-latest]  # 测试多个操作系统
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4  # 检出代码
+
+      - name: Set up Go
+        uses: actions/setup-go@v4  # 设置 Go 环境
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Cache dependencies
+        uses: actions/cache@v3  # 缓存依赖
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: go mod download  # 下载依赖
+
+      - name: Run tests
+        run: go test -v ./...  # 运行测试
+
+      - name: Build binary
+        run: go build -o myapp ./cmd/main.go  # 构建可执行文件
+        if: matrix.os == 'ubuntu-latest'  # 只在 Ubuntu 上构建
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v3  # 上传构建的二进制文件
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          name: myapp
+          path: myapp
