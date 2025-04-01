@@ -1,68 +1,50 @@
-name: Go Cross-Platform Build
+name: CI
 
-on: [push, pull_request]
+on: [push, pull_request,workflow_dispatch]
 
 env:
-  GO_VERSION: "1.21"
-  OUTPUT_DIR: "dist"
+  BINARY_PREFIX: "PortLink_"
+  BINARY_SUFFIX: ""
+  COMMIT_ID: "${{ github.sha }}"
+  PR_PROMPT: "::warning:: Build artifact will not be uploaded due to the workflow is trigged by pull request."
 
 jobs:
   build:
+    name: Build binary CI
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
       matrix:
-        include:
-          - name: "windows-amd64"
-            os: windows
-            arch: amd64
-            ext: ".exe"
-            output_suffix: "windows-x86_64.exe"
-          - name: "linux-amd64"
-            os: linux
-            arch: amd64
-            ext: ""
-            output_suffix: "linux-x86_64"
-
+        # build and publish in parallel: linux/386, linux/amd64, windows/386, windows/amd64, darwin/amd64, darwin/arm64
+        goos: [linux, windows, darwin]
+        goarch: ["386", amd64, arm, arm64]
+        exclude:
+          - goos: darwin
+            goarch: arm
+          - goos: darwin
+            goarch: "386"
+      fail-fast: true
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Go
+      - name: Setup Go environment
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Create output directory
-        run: mkdir -p "${{ env.OUTPUT_DIR }}"
-
-      - name: Set app name
-        id: set-app-name
-        run: |
-          # 从go.mod获取模块名作为应用名
-          APP_NAME=$(grep '^module' go.mod | awk '{print $2}' | awk -F/ '{print $NF}')
-          echo "APP_NAME=${APP_NAME}" >> $GITHUB_ENV
-          echo "Using app name: ${APP_NAME}"
-
-      - name: Build
+          cache: true
+          go-version: '1.21'
+      - name: Build binary file
         env:
-          GOOS: ${{ matrix.os }}
-          GOARCH: ${{ matrix.arch }}
-          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          IS_PR: ${{ !!github.head_ref }}
         run: |
-          OUTPUT="${{ env.APP_NAME }}-${{ matrix.output_suffix }}"
-          echo "Building ${OUTPUT}"
-          
-          go build -v -o "${{ env.OUTPUT_DIR }}/${OUTPUT}" .
-          
-          # 生成校验和
-          (cd "${{ env.OUTPUT_DIR }}" && \
-           sha256sum "${OUTPUT}" > "${OUTPUT}.sha256")
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+          if [ $GOOS = "windows" ]; then export BINARY_SUFFIX="$BINARY_SUFFIX.exe"; fi
+          if $IS_PR ; then echo $PR_PROMPT; fi
+          export BINARY_NAME="$BINARY_PREFIX"$GOOS"_$GOARCH$BINARY_SUFFIX"
+          export CGO_ENABLED=0
+          export LD_FLAGS="-w -s -X github.com/Mrs4s/go-cqhttp/internal/base.Version=${COMMIT_ID::7}"
+          go build -o "output/$BINARY_NAME" -trimpath -ldflags "$LD_FLAGS" .
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        if: ${{ !github.head_ref }}
         with:
-          name: ${{ matrix.name }}
-          path: |
-            ${{ env.OUTPUT_DIR }}/${{ env.APP_NAME }}-${{ matrix.output_suffix }}
-            ${{ env.OUTPUT_DIR }}/${{ env.APP_NAME }}-${{ matrix.output_suffix }}.sha256
-          retention-days: 7
+          name: ${{ matrix.goos }}_${{ matrix.goarch }}
+          path: output/
