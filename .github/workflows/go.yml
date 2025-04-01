@@ -9,7 +9,8 @@ on:
 env:
   GO_VERSION: "1.23"
   PROJECT_NAME: "PortLink"  # 替换为你的项目名
-
+  CGO_ENABLED: "1"  # 禁用CGO以获得更可移植的二进制文件
+  
 jobs:
   build:
     name: Build
