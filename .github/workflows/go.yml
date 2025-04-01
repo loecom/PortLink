@@ -1,4 +1,4 @@
-name: Go Cross-Platform Build
+name: Go Cross-Platform Build (x64 & arm64)
 
 on:
   push:
@@ -16,12 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest]
-        arch: ["386", "amd64", "arm64"]
-        exclude:
-          # 排除不支持的组合
-          - os: windows-latest
-            arch: arm64  # Windows通常不需要arm64构建
+        target:
+          - { os: "linux", arch: "amd64", ext: "" }
+          - { os: "linux", arch: "arm64", ext: "" }
+          - { os: "windows", arch: "amd64", ext: ".exe" }
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -40,25 +38,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Build
+      - name: Build binaries
         run: |
-          export GOOS=$(echo ${{ matrix.os }} | cut -d'-' -f1)
-          if [ "$GOOS" = "windows" ]; then
-            export GOOS=windows
-            export EXT=".exe"
-          else
-            export EXT=""
-          fi
+          GOOS=${{ matrix.target.os }} GOARCH=${{ matrix.target.arch }} \
+          go build -v -o "bin/${{ env.PROJECT_NAME }}-${{ matrix.target.os }}-${{ matrix.target.arch }}${{ matrix.target.ext }}" ./...
           
-          export GOARCH=${{ matrix.arch }}
-          OUTPUT="${PROJECT_NAME}-${GOOS}-${GOARCH}${EXT}"
-          
-          go build -v -o "bin/$OUTPUT" ./...
-          echo "Built: bin/$OUTPUT"
-          
-          # 计算SHA256校验和
-          sha256sum "bin/$OUTPUT" | awk '{print $1}' > "bin/$OUTPUT.sha256"
-        shell: bash
+          # 生成SHA256校验和
+          cd bin && \
+          sha256sum "${{ env.PROJECT_NAME }}-${{ matrix.target.os }}-${{ matrix.target.arch }}${{ matrix.target.ext }}" \
+          > "${{ env.PROJECT_NAME }}-${{ matrix.target.os }}-${{ matrix.target.arch }}${{ matrix.target.ext }}.sha256"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
@@ -67,27 +55,3 @@ jobs:
           path: bin/
           if-no-files-found: error
           retention-days: 5
-
-  # 专门为Linux ARM64构建（如果需要不同的构建参数）
-  linux-arm64:
-    name: Linux ARM64 Build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go ${{ env.GO_VERSION }}
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Build for Linux ARM64
-        run: |
-          GOOS=linux GOARCH=arm64 go build -v -o "bin/${PROJECT_NAME}-linux-arm64" ./...
-          sha256sum "bin/${PROJECT_NAME}-linux-arm64" | awk '{print $1}' > "bin/${PROJECT_NAME}-linux-arm64.sha256"
-
-      - name: Upload Linux ARM64 artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: linux-arm64-binary
-          path: bin/${PROJECT_NAME}-linux-arm64*
