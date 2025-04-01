@@ -3,33 +3,32 @@ name: Go Cross-Platform Build
 on: [push, pull_request]
 
 env:
-  GO_VERSION: "1.21.0"  # 已验证可用的版本（1.23.4可能Actions尚未支持）
-  PROJECT_NAME: "PortLink"  # 改为你的模块名（来自go.mod）
+  GO_VERSION: "1.21"  # 使用稳定版本
+  PROJECT_NAME: "PortLink"  # 必须与go.mod中的模块名一致
   OUTPUT_DIR: "dist"
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # 防止长时间运行被取消
     strategy:
+      fail-fast: false  # 防止一个失败导致全部取消
       matrix:
         platform:
-          - { os: linux, arch: amd64, ext: "" }
-          - { os: linux, arch: arm64, ext: "" }
+          - { os: linux, arch: amd64 }
+          - { os: linux, arch: arm64 }
           - { os: windows, arch: amd64, ext: ".exe" }
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate go.mod exists
+      - name: Verify go.mod
         run: test -f go.mod || (echo "❌ go.mod file missing" && exit 1)
 
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
-        id: go-setup
-
-      - name: Check Go version
-        run: go version
 
       - name: Prepare output
         run: mkdir -p ${{ env.OUTPUT_DIR }}
@@ -40,20 +39,21 @@ jobs:
           GOARCH: ${{ matrix.platform.arch }}
           CGO_ENABLED: 0
         run: |
-          OUTPUT="${{ env.PROJECT_NAME }}-${{ matrix.platform.os }}-${{ matrix.platform.arch }}${{ matrix.platform.ext }}"
-          echo "▶️ Building $OUTPUT"
+          EXT="${matrix.platform.ext:-}"  # 处理没有ext定义的情况
+          OUTPUT="${{ env.PROJECT_NAME }}-${{ matrix.platform.os }}-${{ matrix.platform.arch }}${EXT}"
           
-          go build -v -o "${{ env.OUTPUT_DIR }}/$OUTPUT" ./... || (echo "❌ Build failed" && exit 1)
+          echo "▶️ Building $OUTPUT"
+          go build -v -o "${{ env.OUTPUT_DIR }}/$OUTPUT" ./...
           
           # 生成校验和
-          cd ${{ env.OUTPUT_DIR }} && \
-          sha256sum "$OUTPUT" > "$OUTPUT.sha256" && \
-          echo "✅ Build successful"
+          (cd ${{ env.OUTPUT_DIR }} && \
+           sha256sum "$OUTPUT" > "$OUTPUT.sha256")
 
       - name: Upload artifacts
-        if: success()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4  # 必须使用v4版本
         with:
-          name: ${{ matrix.platform.os }}-${{ matrix.platform.arch }}
-          path: ${{ env.OUTPUT_DIR }}/${{ env.PROJECT_NAME }}-${{ matrix.platform.os }}-${{ matrix.platform.arch }}*
+          name: ${{ matrix.platform.os }}-${{ matrix.platform.arch }}-binary
+          path: |
+            ${{ env.OUTPUT_DIR }}/${{ env.PROJECT_NAME }}-${{ matrix.platform.os }}-${{ matrix.platform.arch }}*
+          if-no-files-found: error
           retention-days: 3
