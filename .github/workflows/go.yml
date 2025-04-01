@@ -3,7 +3,8 @@ name: CI
 on: [push, pull_request]
 
 env:
-  BINARY_PREFIX: "PortLink"
+  GO_VERSION: "1.24"
+  OUTPUT_DIR: "dist"
   BINARY_SUFFIX: ""
   COMMIT_ID: "${{ github.sha }}"
   PR_PROMPT: "::warning:: Build artifact will not be uploaded due to the workflow is trigged by pull request."
@@ -24,7 +25,14 @@ jobs:
         uses: actions/setup-go@v4
         with:
           cache: true
-          go-version: '1.24'
+          go-version: ${{ env.GO_VERSION }}
+      - name: Set app name
+        id: set-app-name
+        run: |
+          # 从go.mod获取模块名作为应用名
+          APP_NAME=$(grep '^module' go.mod | awk '{print $2}' | awk -F/ '{print $NF}')
+          echo "APP_NAME=${APP_NAME}" >> $GITHUB_ENV
+          echo "Using app name: ${APP_NAME}"
       - name: Build binary file
         env:
           GOOS: ${{ matrix.goos }}
@@ -33,13 +41,13 @@ jobs:
         run: |
           if [ $GOOS = "windows" ]; then export BINARY_SUFFIX="$BINARY_SUFFIX.exe"; fi
           if $IS_PR ; then echo $PR_PROMPT; fi
-          export BINARY_NAME="$BINARY_PREFIX$BINARY_SUFFIX"
+          export BINARY_NAME="${{ env.APP_NAME }}$BINARY_SUFFIX"
           export CGO_ENABLED=0
           export LD_FLAGS="-w -s"
-          go build -o "output/$BINARY_NAME" -trimpath -ldflags "$LD_FLAGS" .
+          go build -o "${{ env.OUTPUT_DIR }}/$BINARY_NAME" -trimpath -ldflags "$LD_FLAGS" .
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         if: ${{ !github.head_ref }}
         with:
-          name: ${{ env.BINARY_PREFIX }}_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: output/
+          name: ${{ env.APP_NAME }}_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: ${{ env.OUTPUT_DIR }}/
