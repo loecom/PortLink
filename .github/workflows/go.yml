@@ -1,11 +1,11 @@
-name: CI
+name: Go Cross-Platform Build
 
 on: [push, pull_request]
 
 env:
   GO_VERSION: "1.24"
   OUTPUT_DIR: "dist"
-  BINARY_SUFFIX: ""
+  APP_SUFFIX: ""
   COMMIT_ID: "${{ github.sha }}"
   PR_PROMPT: "::warning:: Build artifact will not be uploaded due to the workflow is trigged by pull request."
 
@@ -18,7 +18,7 @@ jobs:
         # build and publish in parallel: linux/386, linux/amd64, windows/386, windows/amd64, darwin/amd64, darwin/arm64
         goos: [linux, windows]
         goarch: ["386", amd64, arm, arm64]
-      fail-fast: true
+      fail-fast: false
     steps:
       - uses: actions/checkout@v4
       - name: Setup Go environment
@@ -39,12 +39,12 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           IS_PR: ${{ !!github.head_ref }}
         run: |
-          if [ $GOOS = "windows" ]; then export BINARY_SUFFIX="$BINARY_SUFFIX.exe"; fi
+          if [ $GOOS = "windows" ]; then export APP_SUFFIX="$APP_SUFFIX.exe"; fi
           if $IS_PR ; then echo $PR_PROMPT; fi
-          export BINARY_NAME="${{ env.APP_NAME }}$BINARY_SUFFIX"
+          export OUTPUT_NAME="${{ env.APP_NAME }}$APP_SUFFIX"
           export CGO_ENABLED=0
           export LD_FLAGS="-w -s"
-          go build -o "${{ env.OUTPUT_DIR }}/$BINARY_NAME" -trimpath -ldflags "$LD_FLAGS" .
+          go build -o "${{ env.OUTPUT_DIR }}/$OUTPUT_NAME" -trimpath -ldflags "$LD_FLAGS" .
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         if: ${{ !github.head_ref }}
