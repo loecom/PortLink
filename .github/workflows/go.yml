@@ -7,8 +7,9 @@ on:
     branches: [ main, master ]
 
 env:
-  GO_VERSION: "1.23.4"  # 指定Go版本
-  PROJECT_NAME: "PortLink"  # 替换为你的项目名称
+  GO_VERSION: "1.23.4"
+  PROJECT_NAME: "PortLink"  # 替换为你的项目名
+  CGO_ENABLED: "0"  # 禁用CGO以获得更可移植的二进制文件
 
 jobs:
   build:
@@ -16,42 +17,43 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target:
-          - { os: "linux", arch: "amd64", ext: "" }
-          - { os: "linux", arch: "arm64", ext: "" }
-          - { os: "windows", arch: "amd64", ext: ".exe" }
+        include:
+          - os: linux
+            arch: amd64
+            ext: ""
+          - os: linux
+            arch: arm64
+            ext: ""
+          - os: windows
+            arch: amd64
+            ext: ".exe"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Go ${{ env.GO_VERSION }}
+      - name: Setup Go
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+      - name: Create output directory
+        run: mkdir -p release
 
-      - name: Build binaries
+      - name: Build
         run: |
-          GOOS=${{ matrix.target.os }} GOARCH=${{ matrix.target.arch }} \
-          go build -v -o "bin/${{ env.PROJECT_NAME }}-${{ matrix.target.os }}-${{ matrix.target.arch }}${{ matrix.target.ext }}" ./...
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} CGO_ENABLED=${{ env.CGO_ENABLED }} \
+          go build -v -trimpath -ldflags="-s -w" \
+          -o "release/${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}" \
+          ./...
           
-          # 生成SHA256校验和
-          cd bin && \
-          sha256sum "${{ env.PROJECT_NAME }}-${{ matrix.target.os }}-${{ matrix.target.arch }}${{ matrix.target.ext }}" \
-          > "${{ env.PROJECT_NAME }}-${{ matrix.target.os }}-${{ matrix.target.arch }}${{ matrix.target.ext }}.sha256"
+          # 生成校验和
+          cd release && \
+          sha256sum "${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}" \
+          > "${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}.sha256"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: binaries
-          path: bin/
-          if-no-files-found: error
-          retention-days: 5
+          name: ${{ matrix.os }}-${{ matrix.arch }}-binaries
+          path: release/
+          retention-days: 7
