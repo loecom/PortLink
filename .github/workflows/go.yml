@@ -5,6 +5,7 @@ on: [push, pull_request]
 env:
   GO_VERSION: "1.21"
   OUTPUT_DIR: "dist"
+  APP_NAME: "PortLink"  # 请替换为您的应用名称
 
 jobs:
   build:
@@ -12,10 +13,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - { os: linux, arch: amd64, ext: "" }
-          - { os: linux, arch: arm64, ext: "" }
-          - { os: windows, arch: amd64, ext: ".exe" }
+        include:
+          - name: "windows-amd64"
+            os: windows
+            arch: amd64
+            ext: ".exe"
+            output: "${{ env.APP_NAME }}-windows-x86_64.exe"
+          - name: "linux-amd64"
+            os: linux
+            arch: amd64
+            ext: ""
+            output: "${{ env.APP_NAME }}-linux-x86_64"
 
     steps:
       - uses: actions/checkout@v4
@@ -30,23 +38,22 @@ jobs:
 
       - name: Build
         env:
-          GOOS: ${{ matrix.target.os }}
-          GOARCH: ${{ matrix.target.arch }}
-          EXT: ${{ matrix.target.ext }}
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: "0"
         run: |
-          OUTPUT="app-${{ matrix.target.os }}-${{ matrix.target.arch }}$EXT"
-          echo "Building $OUTPUT"
-          
-          go build -v -o "${{ env.OUTPUT_DIR }}/$OUTPUT" .
+          echo "Building ${{ matrix.output }}"
+          go build -v -o "${{ env.OUTPUT_DIR }}/${{ matrix.output }}" .
           
           # 生成校验和
           (cd "${{ env.OUTPUT_DIR }}" && \
-           sha256sum "$OUTPUT" > "$OUTPUT.sha256")
+           sha256sum "${{ matrix.output }}" > "${{ matrix.output }}.sha256")
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.target.os }}-${{ matrix.target.arch }}
-          path: ${{ env.OUTPUT_DIR }}/app-${{ matrix.target.os }}-${{ matrix.target.arch }}*
-          retention-days: 3
+          name: ${{ matrix.name }}
+          path: |
+            ${{ env.OUTPUT_DIR }}/${{ matrix.output }}
+            ${{ env.OUTPUT_DIR }}/${{ matrix.output }}.sha256
+          retention-days: 7
