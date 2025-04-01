@@ -1,59 +1,70 @@
-name: Go Cross-Platform Build
+name: Go Build Matrix
 
 on: [push, pull_request]
 
 env:
-  GO_VERSION: "1.21"  # 使用稳定版本
-  PROJECT_NAME: "PortLink"  # 必须与go.mod中的模块名一致
+  GO_VERSION: "1.21"  # 官方验证过的稳定版本
   OUTPUT_DIR: "dist"
 
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15  # 防止长时间运行被取消
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Validate Project Structure
+        run: |
+          [ -f go.mod ] || (echo "❌ go.mod not found" && exit 1)
+          echo "✅ Project contains go.mod"
+          echo "Module name: $(head -1 go.mod)"
+
+  build:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
-      fail-fast: false  # 防止一个失败导致全部取消
+      fail-fast: false
       matrix:
-        platform:
-          - { os: linux, arch: amd64 }
-          - { os: linux, arch: arm64 }
-          - { os: windows, arch: amd64, ext: ".exe" }
+        target:
+          - { os: linux, arch: amd64, ext: '' }
+          - { os: linux, arch: arm64, ext: '' }
+          - { os: windows, arch: amd64, ext: '.exe' }
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Verify go.mod
-        run: test -f go.mod || (echo "❌ go.mod file missing" && exit 1)
 
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
 
-      - name: Prepare output
-        run: mkdir -p ${{ env.OUTPUT_DIR }}
+      - name: Show Go Env
+        run: go env
 
-      - name: Build
+      - name: Build Debug Info
+        run: |
+          echo "📌 Build Target: ${{ matrix.target.os }}/${{ matrix.target.arch }}"
+          echo "📌 Project Files:"
+          ls -la
+          echo "📌 Go Modules:"
+          go list -m all
+
+      - name: Build Binary
         env:
-          GOOS: ${{ matrix.platform.os }}
-          GOARCH: ${{ matrix.platform.arch }}
+          GOOS: ${{ matrix.target.os }}
+          GOARCH: ${{ matrix.target.arch }}
           CGO_ENABLED: 0
         run: |
-          EXT="${matrix.platform.ext:-}"  # 处理没有ext定义的情况
-          OUTPUT="${{ env.PROJECT_NAME }}-${{ matrix.platform.os }}-${{ matrix.platform.arch }}${EXT}"
-          
-          echo "▶️ Building $OUTPUT"
-          go build -v -o "${{ env.OUTPUT_DIR }}/$OUTPUT" ./...
-          
-          # 生成校验和
-          (cd ${{ env.OUTPUT_DIR }} && \
-           sha256sum "$OUTPUT" > "$OUTPUT.sha256")
+          mkdir -p ${{ env.OUTPUT_DIR }}
+          OUTPUT="${{ github.repository }}".split('/')[-1]  # 自动从仓库名获取项目名
+          go build -v -o "${{ env.OUTPUT_DIR }}/$OUTPUT-${{ matrix.target.os }}-${{ matrix.target.arch }}${{ matrix.target.ext }}" .
+          echo "✅ Build succeeded"
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4  # 必须使用v4版本
+      - name: Upload Artifact
+        if: success()
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform.os }}-${{ matrix.platform.arch }}-binary
-          path: |
-            ${{ env.OUTPUT_DIR }}/${{ env.PROJECT_NAME }}-${{ matrix.platform.os }}-${{ matrix.platform.arch }}*
-          if-no-files-found: error
+          name: ${{ matrix.target.os }}-${{ matrix.target.arch }}
+          path: ${{ env.OUTPUT_DIR }}/*
           retention-days: 3
