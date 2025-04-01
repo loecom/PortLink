@@ -5,7 +5,6 @@ on: [push, pull_request]
 env:
   GO_VERSION: "1.21"
   OUTPUT_DIR: "dist"
-  APP_NAME: "PortLink"  # 请替换为您的应用名称
 
 jobs:
   build:
@@ -18,12 +17,12 @@ jobs:
             os: windows
             arch: amd64
             ext: ".exe"
-            output: "${{ env.APP_NAME }}-windows-x86_64.exe"
+            output_suffix: "windows-x86_64.exe"
           - name: "linux-amd64"
             os: linux
             arch: amd64
             ext: ""
-            output: "${{ env.APP_NAME }}-linux-x86_64"
+            output_suffix: "linux-x86_64"
 
     steps:
       - uses: actions/checkout@v4
@@ -36,24 +35,34 @@ jobs:
       - name: Create output directory
         run: mkdir -p "${{ env.OUTPUT_DIR }}"
 
+      - name: Set app name
+        id: set-app-name
+        run: |
+          # 从go.mod获取模块名作为应用名
+          APP_NAME=$(grep '^module' go.mod | awk '{print $2}' | awk -F/ '{print $NF}')
+          echo "APP_NAME=${APP_NAME}" >> $GITHUB_ENV
+          echo "Using app name: ${APP_NAME}"
+
       - name: Build
         env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: "0"
         run: |
-          echo "Building ${{ matrix.output }}"
-          go build -v -o "${{ env.OUTPUT_DIR }}/${{ matrix.output }}" .
+          OUTPUT="${{ env.APP_NAME }}-${{ matrix.output_suffix }}"
+          echo "Building ${OUTPUT}"
+          
+          go build -v -o "${{ env.OUTPUT_DIR }}/${OUTPUT}" .
           
           # 生成校验和
           (cd "${{ env.OUTPUT_DIR }}" && \
-           sha256sum "${{ matrix.output }}" > "${{ matrix.output }}.sha256")
+           sha256sum "${OUTPUT}" > "${OUTPUT}.sha256")
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
           path: |
-            ${{ env.OUTPUT_DIR }}/${{ matrix.output }}
-            ${{ env.OUTPUT_DIR }}/${{ matrix.output }}.sha256
+            ${{ env.OUTPUT_DIR }}/${{ env.APP_NAME }}-${{ matrix.output_suffix }}
+            ${{ env.OUTPUT_DIR }}/${{ env.APP_NAME }}-${{ matrix.output_suffix }}.sha256
           retention-days: 7
