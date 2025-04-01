@@ -1,59 +1,59 @@
-name: Go Cross-Platform Build (x64 & arm64)
+name: Go Cross-Platform Build
 
-on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+on: [push, pull_request]
 
 env:
-  GO_VERSION: "1.23"
-  PROJECT_NAME: "PortLink"  # 替换为你的项目名
-  CGO_ENABLED: "1"  # 禁用CGO以获得更可移植的二进制文件
-  
+  GO_VERSION: "1.21.0"  # 已验证可用的版本（1.23.4可能Actions尚未支持）
+  PROJECT_NAME: "PortLink"  # 改为你的模块名（来自go.mod）
+  OUTPUT_DIR: "dist"
+
 jobs:
   build:
-    name: Build
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-          - os: linux
-            arch: amd64
-            ext: ""
-          - os: linux
-            arch: arm64
-            ext: ""
-          - os: windows
-            arch: amd64
-            ext: ".exe"
+        platform:
+          - { os: linux, arch: amd64, ext: "" }
+          - { os: linux, arch: arm64, ext: "" }
+          - { os: windows, arch: amd64, ext: ".exe" }
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Validate go.mod exists
+        run: test -f go.mod || (echo "❌ go.mod file missing" && exit 1)
 
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
+        id: go-setup
 
-      - name: Create output directory
-        run: mkdir -p release
+      - name: Check Go version
+        run: go version
+
+      - name: Prepare output
+        run: mkdir -p ${{ env.OUTPUT_DIR }}
 
       - name: Build
+        env:
+          GOOS: ${{ matrix.platform.os }}
+          GOARCH: ${{ matrix.platform.arch }}
+          CGO_ENABLED: 0
         run: |
-          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} CGO_ENABLED=${{ env.CGO_ENABLED }} \
-          go build -v -trimpath -ldflags="-s -w" \
-          -o "release/${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}" \
-          ./...
+          OUTPUT="${{ env.PROJECT_NAME }}-${{ matrix.platform.os }}-${{ matrix.platform.arch }}${{ matrix.platform.ext }}"
+          echo "▶️ Building $OUTPUT"
+          
+          go build -v -o "${{ env.OUTPUT_DIR }}/$OUTPUT" ./... || (echo "❌ Build failed" && exit 1)
           
           # 生成校验和
-          cd release && \
-          sha256sum "${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}" \
-          > "${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}.sha256"
+          cd ${{ env.OUTPUT_DIR }} && \
+          sha256sum "$OUTPUT" > "$OUTPUT.sha256" && \
+          echo "✅ Build successful"
 
       - name: Upload artifacts
+        if: success()
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.os }}-${{ matrix.arch }}-binaries
-          path: release/
-          retention-days: 7
+          name: ${{ matrix.platform.os }}-${{ matrix.platform.arch }}
+          path: ${{ env.OUTPUT_DIR }}/${{ env.PROJECT_NAME }}-${{ matrix.platform.os }}-${{ matrix.platform.arch }}*
+          retention-days: 3
