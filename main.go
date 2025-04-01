@@ -12,7 +12,11 @@ import (
 	"time"
 	"github.com/gorilla/mux"
 	"flag"
+        _ "embed"
 )
+
+//go:embed PortLink.png
+var favicon []byte
 
 const jsonFilePath = "db.json"
 
@@ -45,6 +49,12 @@ func main() {
 		w.Header().Set("Content-Type", "text/html;charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, getRegisterHtml())
+	}).Methods("GET")
+
+	// 添加路由来提供嵌入的图片
+	router.HandleFunc("/favicon.png", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(favicon)
 	}).Methods("GET")
 
 	// API路由处理
@@ -370,6 +380,7 @@ func getIndex() string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>内网跳转穿透工具</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
     <style>
         /* 全局样式 */
         body {
@@ -615,6 +626,7 @@ func getPasswordHtml(channel_id string) string {
 <head>
     <meta charset="utf-8">
     <title>访问验证</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
     <style>
         body { font-family: Arial, sans-serif; max-width: 400px; margin: 40px auto; padding: 20px; }
         .form-group { margin-bottom: 15px; }
@@ -683,6 +695,7 @@ func getRegisterHtml() string {
 <head>
     <meta charset="utf-8">
     <title>内网跳转 - 注册</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
     <style>
         body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
         .form-group { margin-bottom: 15px; }
