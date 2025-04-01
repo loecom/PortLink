@@ -46,5 +46,5 @@ jobs:
         uses: actions/upload-artifact@v4
         if: ${{ !github.head_ref }}
         with:
-          name: ${{$BINARY_PREFIX}}_${{ matrix.goos }}_${{ matrix.goarch }}
+          name: ${{ env.BINARY_PREFIX }}_${{ matrix.goos }}_${{ matrix.goarch }}
           path: output/
