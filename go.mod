@@ -1,4 +1,4 @@
-module PortLink
+module portlink
 
 go 1.23.4
 
