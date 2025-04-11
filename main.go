@@ -12,13 +12,15 @@ import (
 	"time"
 	"github.com/gorilla/mux"
 	"flag"
+	"path/filepath"
         _ "embed"
 )
 
 //go:embed PortLink.png
 var favicon []byte
 
-const jsonFilePath = "db.json"
+//const jsonFilePath = "db.json"
+var jsonFilePath string
 
 type User struct {
 	Password string `json:"password"`
@@ -29,6 +31,17 @@ type User struct {
 }
 
 var reservedchannel_ids = []string{"api", "admin", "register", "login", "static"}
+
+func init() {
+    // 初始化 jsonFilePath
+    execPath, err := os.Executable()
+    if err != nil {
+        panic(err)
+    }
+
+    execDir := filepath.Dir(execPath)
+    jsonFilePath = filepath.Join(execDir, "db.json")
+}
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
