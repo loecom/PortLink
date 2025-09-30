@@ -79,7 +79,7 @@ func main() {
 	router.HandleFunc("/{channel_id:.+}", func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		channel_id := vars["channel_id"]
-		pathParts := strings.Split(r.网站.Path, "/")
+		pathParts := strings.Split(r.URL.Path, "/")
 		if len(pathParts) < 2 {
     			w.WriteHeader(http.StatusBadRequest)
     			fmt.Fprint(w, "无效的路径")
@@ -192,7 +192,7 @@ func handleJsonRedirect(r *http.Request, channel_id string, pathParts []string, 
 	}
 
 	// 解析请求的 URL
-	u, _ := url.Parse(r.网站.String())
+	u, _ := url.Parse(r.URL.String())
 
 	protocol := "http"
 	if user.Https {
@@ -807,6 +807,7 @@ func getRegisterHtml() string {
 </body>
 </html>`
 }
+
 
 
 
