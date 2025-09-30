@@ -23,7 +23,7 @@ var favicon []byte
 var jsonFilePath string
 
 type User struct {
-	Password string `json:"password"`
+密码string `json:"password"`
 	Https    bool   `json:"https"`
 	Host       string `json:"host"`
 	Port     string `json:"port"`
@@ -392,7 +392,7 @@ func getIndex() string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>内网跳转穿透工具</title>
+    <title>酒破儿之家</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <style>
         /* 全局样式 */
@@ -585,26 +585,27 @@ func getIndex() string {
 </head>
 <body>
     <div class="container">
-        <h1>操作简单，点对点高速直联，高效稳定</h1>
+        <h1>直连酒破儿的家</h1>
         <div class="input-group">
-            <input type="text" id="inputText" placeholder="请输入内网通ID">
-            <button onclick="redirect()">穿透内网</button>
+            <input type="text" id="inputText" placeholder="请输入回家通道ID">
+            <button onclick="redirect()">直接回家</button>
         </div>
-        <div class="tip"><a href="/register" target="_blank">注册</a>
+        <div class="tip"><a href="/register" target="_blank">注册回家通道</a>
         </div>
 
         <!-- 核心优势 -->
         <div class="advantages">
-            <h2>产品核心优势</h2>
+            <h2>回家核心优势</h2>
             <ul>
+			    <!--
                 <li><strong>永久免费：</strong>还有什么东西能比免费更好。</li>
-                
                 <li><strong>配置简单：</strong>设备要求低，配置简单。</li>
                 <li><strong>无需工具：</strong>WEB应用直接浏览器访问，客户端无需工具。</li>
                 <li><strong>高速直联：</strong>STUN内网穿透，免服务器中转点对点更高效。</li>
                 <li><strong>固定地址：</strong>穿透地址永不过期，也不需要频繁验证。</li>
                 <li><strong>跳转加密：</strong>可加入验证密码，提升部分应用安全性。</li>
                 <li><strong>携带后缀：</strong>支持携带后缀跳转，无公网IP也能分享文件。</li>
+				-->
             </ul>
         </div>
     </div>
@@ -616,7 +617,7 @@ func getIndex() string {
             if (inputText) {
                 window.location.href = '/' + encodeURIComponent(inputText);
             } else {
-                alert('请输入内网通ID');
+                alert('请输入回家通道ID');
             }
         }
 
@@ -815,3 +816,4 @@ func getRegisterHtml() string {
 </body>
 </html>`
 }
+
