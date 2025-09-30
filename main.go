@@ -23,7 +23,7 @@ var favicon []byte
 var jsonFilePath string
 
 type User struct {
-密码string `json:"password"`
+    Password    string `json:"password"`
 	Https    bool   `json:"https"`
 	Host       string `json:"host"`
 	Port     string `json:"port"`
@@ -807,5 +807,6 @@ func getRegisterHtml() string {
 </body>
 </html>`
 }
+
 
 
